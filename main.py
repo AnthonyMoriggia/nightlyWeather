@@ -1,6 +1,8 @@
 import logging
 import os
 import requests
+import schedule
+import time
 from datetime import datetime, timedelta
 from twilio.rest import Client
 from dotenv import load_dotenv
@@ -29,9 +31,9 @@ LOWEST_ALLOWED_TEMP = 65
 def fetch_hourly_weather():
     # Url for Weather API to pull only hourly weather
     url = (
-        f"https://api.openweathermap.org/data/2.5/onecall?"
+        f"https://api.openweathermap.org/data/3.0/onecall?"
         f"lat={LAT}&lon={LON}"
-        f"&exclude=current,minutely,daily,alerts"
+        f"&exclude=minutely,daily,alerts"
         f"&appid={WEATHER_API_KEY}&units=imperial"
     )
     # Get response from API as JSON
@@ -55,16 +57,17 @@ def alert(hourly_data):
 
 
 def send_sms(message):
+    #logging.info("[TEST MODE] Message to be sent: %s", message)
     client = Client(TWILIO_SID, TWILIO_TOKEN)
     sms = client.messages.create(
         body=message,
-        from_=TWILIO_FROM
+        from_=TWILIO_FROM,
         to=TWILIO_TO
     )
     logging.info("SMS sent, SID: %s", sms.sid)
 
 
-def main():
+def run_weather_check():
     try:
         hourly = fetch_hourly_weather()
         message = alert(hourly)
@@ -72,5 +75,18 @@ def main():
     except Exception as e:
         logging.exception("Something went wrong.")
 
+
+def start_scheduler():
+    schedule.every().day.at("20:45").do(run_weather_check)
+    logging.info("Weather checker started. Daily checks at 8:50 PM.")
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
 if __name__ == "__main__":
-    main()
+    start_scheduler()
+    # Testing without sms
+    # hourly = fetch_hourly_weather()
+    # message = alert(hourly)
+    # print(message)
+
